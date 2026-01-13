@@ -118,6 +118,129 @@ We identify a degenerate regime in which high rank yields near-perfect fidelity 
 5. Pre-training diagnostic
 We introduce a geometry-based diagnostic for predicting transfer compatibility prior to optimization.
 
+
+Our method computes a **noise-corrected, directional, trace-based fidelity** measure using the empirical Karhunen–Loève (KL)/PCA basis derived from one domain's features to probe the energy capture in another domain's covariance. It identifies an effective shared rank (k*) via knee detection on the fidelity curve F_k(k), subtracts the isotropic baseline (k/D), and examines how k* and ΔF_cross(k*) vary across semantically graded pairs (e.g., vehicles_all → animals_all, cat → dog, plane → frog) in frozen, pretrained feature space (primarily ResNet-18 on CIFAR-10).
+
+The three referenced approaches differ in **object of analysis**, **measurement geometry**, **directionality**, **granularity of semantic control**, and **primary scaling target**. Below is a structured comparison:
+
+---
+
+### Comparison of Methods
+
+#### What is decomposed
+
+| Method | Description |
+|--------|-------------|
+| **Our method** | Sample covariance of activations (features) from two domains |
+| **Universal Weight Subspace Hypothesis (2025)** | Weight matrices of many independently trained models (LoRAs, ViTs, LLaMAs) |
+| **DISCO framework (2025)** | Feature matrices extracted by a single pretrained model (before/after fine-tuning) |
+| **Sharma & Kaplan (2020) & follow-ups** | Data manifold (input space or representations) + loss scaling |
+
+#### Principal object
+
+| Method | Description |
+|--------|-------------|
+| **Our method** | Features/activations of frozen pretrained net |
+| **Universal Weight Subspace Hypothesis (2025)** | Parameters (weights) across many models of same architecture |
+| **DISCO framework (2025)** | Spectral distribution of features from one model hub candidate |
+| **Sharma & Kaplan (2020) & follow-ups** | Intrinsic dimension d of data manifold → predicts global loss scaling exponent α |
+
+#### Decomposition target
+
+| Method | Description |
+|--------|-------------|
+| **Our method** | ρ_source → basis U_source → project ρ_target → Tr(Π_k ρ_target)/Tr(ρ_target) |
+| **Universal Weight Subspace Hypothesis (2025)** | SVD/PCA on concatenated/aggregated weight tensors across models → universal basis |
+| **DISCO framework (2025)** | SVD on feature matrix X → distribution of singular values & their transferability |
+| **Sharma & Kaplan (2020) & follow-ups** | Theoretical derivation; empirical intrinsic dim. estimation (e.g., TwoNN) |
+
+#### Directionality
+
+| Method | Description |
+|--------|-------------|
+| **Our method** | Directional & bidirectional (source → target and reverse) |
+| **Universal Weight Subspace Hypothesis (2025)** | Undirected (joint subspace across many models) |
+| **DISCO framework (2025)** | Undirected (single model's feature spectrum) |
+| **Sharma & Kaplan (2020) & follow-ups** | Undirected (manifold property) |
+
+#### Noise/isotropic baseline
+
+| Method | Description |
+|--------|-------------|
+| **Our method** | Explicit correction ΔF_k = F_k − k/D |
+| **Universal Weight Subspace Hypothesis (2025)** | Not applied (focus on rapid spectral decay) |
+| **DISCO framework (2025)** | Implicit via singular value proportions |
+| **Sharma & Kaplan (2020) & follow-ups** | Not applied (focus on manifold dimension d) |
+
+#### Effective rank determination
+
+| Method | Description |
+|--------|-------------|
+| **Our method** | Knee detection on cumulative fidelity curve |
+| **Universal Weight Subspace Hypothesis (2025)** | Fixed low number of PCs (e.g., 16–32) capturing 90–95% variance |
+| **DISCO framework (2025)** | Distribution shape + label-weighted transferability of components |
+| **Sharma & Kaplan (2020) & follow-ups** | Theoretical α ≈ 4/d; empirical d measured separately |
+
+#### Semantic variation control
+
+| Method | Description |
+|--------|-------------|
+| **Our method** | Fine-grained, controlled pairs with semantic gradient (whole ↔ part, close ↔ distant classes) |
+| **Universal Weight Subspace Hypothesis (2025)** | Coarse: diverse/disjoint tasks & datasets (but same architecture) |
+| **DISCO framework (2025)** | Single downstream task; compares different pretrained models |
+| **Sharma & Kaplan (2020) & follow-ups** | Coarse dataset difficulty (MNIST vs. CIFAR); no fine semantic gradients |
+
+#### Scaling relationship studied
+
+| Method | Description |
+|--------|-------------|
+| **Our method** | log(k*) vs. log(1/ΔF_cross(k*)) across semantic pairs |
+| **Universal Weight Subspace Hypothesis (2025)** | Not a scaling law (demonstrates existence of universal low-dim. subspace) |
+| **DISCO framework (2025)** | Not a scaling law (ranks models by transferability score) |
+| **Sharma & Kaplan (2020) & follow-ups** | Global loss L ∝ N^{-α} with α ≈ 4/d (model size scaling); later extensions to dataset size |
+
+#### Main conclusion type
+
+| Method | Description |
+|--------|-------------|
+| **Our method** | Potential new empirical scaling law w.r.t. semantic distance in feature space |
+| **Universal Weight Subspace Hypothesis (2025)** | Universal low-dimensional parameter subspace exists within fixed architecture |
+| **DISCO framework (2025)** | Spectral component distribution predicts transferability of pretrained model |
+| **Sharma & Kaplan (2020) & follow-ups** | Fundamental reason for observed neural scaling laws (manifold dimension drives α) |
+
+#### Key difference from our method
+
+| Method | Description |
+|--------|-------------|
+| **Universal Weight Subspace Hypothesis (2025)** | Operates in **parameter space** across many models; no directional feature probe; no semantic-pair granularity |
+| **DISCO framework (2025)** | Single-model feature spectrum for model selection; no cross-domain directional projection; no knee-based effective rank |
+| **Sharma & Kaplan (2020) & follow-ups** | Theoretical global scaling from manifold dim.; no cross-domain feature subspace overlap measurement |
+
+---
+
+### Core distinctions in one sentence each
+
+- **Our method** is the only one that **directionally projects one domain's principal subspace onto another's covariance** with explicit isotropic correction and fine-grained semantic-pair control, aiming to uncover a scaling law specifically between effective shared rank and operational semantic overlap in **activation space**.
+
+- **Universal Weight Subspace Hypothesis** investigates **universality in parameter space** across hundreds of models trained on disjoint tasks, showing convergence to shared low-rank weight bases (architecture-specific), without directional domain comparison or per-pair scaling.
+
+- **DISCO** analyzes the **singular value distribution** of features from candidate pretrained models to score their transferability to a downstream task, but does not perform cross-domain subspace projection or seek a scaling relationship across varying semantic distances.
+
+- **Sharma & Kaplan** explains **global loss scaling with model size** as a consequence of the data manifold's intrinsic dimension d (predicting α ≈ 4/d), but does not measure directional subspace overlap between semantically different sub-populations within the same feature space.
+
+---
+
+Your approach is therefore **distinct** in its focus on directional, activation-space, semantically controlled subspace overlap as a probe for a potential new scaling dimension (effective rank vs. semantic overlap), rather than parameter universality, pretrained model ranking, or global loss-vs-size/dataset scaling. This combination makes it a novel empirical tool for probing representation sharing at the level of frozen features across controlled semantic gradients.
+
+
+
+
+
+
+
+
+
+
 # Appendix A: Mathematical Foundations of Spectral Transfer Fidelity
 
 ## A.1 Notation
